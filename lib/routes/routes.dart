@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/chatbot_screen.dart';
+import 'package:hemophilia_manager/screens/main_screen/patient_screens/community_screen.dart';
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/ps_screen/pre_screening.dart';
 import 'package:hemophilia_manager/screens/registration/authentication_landing_screen.dart';
 import 'package:hemophilia_manager/screens/main_screen/healthcare_provider_screen/healthcare_main_screen.dart';
@@ -9,7 +10,7 @@ import 'package:hemophilia_manager/screens/main_screen/patient_screens/dosage_ca
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/log_bleed.dart';
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/log_history_screen.dart';
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/log_infusion.dart';
-import 'package:hemophilia_manager/screens/main_screen/patient_screens/main_screen_display.dart';
+import 'package:hemophilia_manager/screens/main_screen/patient_screens/main_screen_hud.dart';
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/notifications_screen.dart';
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/schedule_medication_screen.dart';
 import 'package:hemophilia_manager/screens/main_screen/patient_screens/settings_screens/main_settings.dart';
@@ -53,34 +54,37 @@ class AppRoutes {
   static const String chatbotScreen = '/chatbot';
   static const String preScreening = '/pre_screening';
   static const String messages = '/messages';
+  static const String community = '/community';
+  static const String postDetail = '/post_detail';
 
-  static Map<String, WidgetBuilder>  routes = {
-      onboarding: (context) => const OnboardingScreen(),
-      authenticationScreen: (context) => const AuthenticationLandingScreen(),
-      login: (context) => const LoginPage(),
-      register: (context) => const CreateAccPage(),
-      roleSelection: (context) => const ChooseRoleSelection(),
-      settings: (context) => const UserSettings(),
-      notifications: (context) => const NotificationsScreen(),
-      doseCalculator: (context) => const DosageCalculatorScreen(),
-      logBleed: (context) => const LogBleed(),
-      scheduleMedication: (context) => const ScheduleMedicationScreen(),
-      userFillup: (context) => const UserDetails(),
-      userAccountCreated: (context) => const UserCreationSuccess(),
-      userScreen: (context) => const MainScreenDisplay(),
-      logHistoryScreen: (context) => const LogHistoryScreen(),
-      careProviderScreen: (context) => const CareProviderScreen(),
-      careUserInformationScreen: (context) => const CareUserInformationScreen(),
-      healthcareMainScreen: (context) => const HealthcareMainScreen(),
-      userInfoSettings: (context) => const UserInfoSettings(),
-      caregiverInfoSettings: (context) => const CaregiverInfoSettings(),
-      medicalInfoSettings: (context) => const MedicalInfoSettings(),
-      changePassword: (context) => const ChangePasswordScreen(),
-      logInfusion: (context) => const LogInfusionScreen(),
-      forgotPassword: (context) => const ForgotPassword(),
-      chatbotScreen: (context) => const ChatbotScreen(),
-      preScreening: (context) => const PreScreeningScreen(),
-      messages: (context) => const MessagesScreen(),
-      // Add other routes here as needed
+  static Map<String, WidgetBuilder> routes = {
+    onboarding: (context) => const OnboardingScreen(),
+    authenticationScreen: (context) => const AuthenticationLandingScreen(),
+    login: (context) => const LoginPage(),
+    register: (context) => const CreateAccPage(),
+    roleSelection: (context) => const ChooseRoleSelection(),
+    settings: (context) => const UserSettings(),
+    notifications: (context) => const NotificationsScreen(),
+    doseCalculator: (context) => const DosageCalculatorScreen(),
+    logBleed: (context) => const LogBleed(),
+    scheduleMedication: (context) => const ScheduleMedicationScreen(),
+    userFillup: (context) => const UserDetails(),
+    userAccountCreated: (context) => const UserCreationSuccess(),
+    userScreen: (context) => const MainScreenDisplay(),
+    logHistoryScreen: (context) => const LogHistoryScreen(),
+    careProviderScreen: (context) => const CareProviderScreen(),
+    careUserInformationScreen: (context) => const CareUserInformationScreen(),
+    healthcareMainScreen: (context) => const HealthcareMainScreen(),
+    userInfoSettings: (context) => const UserInfoSettings(),
+    caregiverInfoSettings: (context) => const CaregiverInfoSettings(),
+    medicalInfoSettings: (context) => const MedicalInfoSettings(),
+    changePassword: (context) => const ChangePasswordScreen(),
+    logInfusion: (context) => const LogInfusionScreen(),
+    forgotPassword: (context) => const ForgotPassword(),
+    chatbotScreen: (context) => const ChatbotScreen(),
+    preScreening: (context) => const PreScreeningScreen(),
+    messages: (context) => const MessagesScreen(),
+    community: (context) => const CommunityScreen(),
+    // Add other routes here as needed
   };
 }

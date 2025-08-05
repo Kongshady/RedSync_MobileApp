@@ -1,0 +1,101 @@
+/*
+ * Manual Database Cleanup Script
+ * 
+ * Copy and paste this code into your Firebase Console -> Firestore Database -> Rules (temporarily)
+ * Or run it through Firebase CLI or a simple Flutter test
+ * 
+ * This will remove all dummy/test posts from your community_posts collection
+ */
+
+// For Firebase Console (JavaScript):
+/*
+// Go to Firestore Database in Firebase Console
+// Open the community_posts collection
+// Look for any posts that contain:
+// - authorId that is empty, "test_user", "dummy_user", or starts with "test_" or "dummy_"
+// - content that contains "test", "dummy", "sample", or starts with "this is a test"
+// 
+// Delete these documents manually by clicking the three dots menu and selecting "Delete document"
+*/
+
+// For Flutter (run this in a test or temporary function):
+/*
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+Future<void> cleanupDummyPosts() async {
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  
+  try {
+    print('Starting cleanup of dummy posts...');
+    
+    // Get all posts
+    final QuerySnapshot postsSnapshot = await firestore
+        .collection('community_posts')
+        .get();
+
+    int deletedCount = 0;
+    
+    for (QueryDocumentSnapshot doc in postsSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final authorId = data['authorId'] as String?;
+      final content = data['content'] as String?;
+      
+      bool isDummyPost = false;
+      
+      // Check for test/dummy author IDs
+      if (authorId == null || 
+          authorId.isEmpty || 
+          authorId == 'test_user' ||
+          authorId == 'dummy_user' ||
+          authorId.startsWith('test_') ||
+          authorId.startsWith('dummy_')) {
+        isDummyPost = true;
+      }
+      
+      // Check for test content
+      if (content != null) {
+        final lowerContent = content.toLowerCase();
+        if (lowerContent.contains('test') ||
+            lowerContent.contains('dummy') ||
+            lowerContent.contains('sample') ||
+            lowerContent.startsWith('this is a test')) {
+          isDummyPost = true;
+        }
+      }
+      
+      // If it's a dummy post, delete it
+      if (isDummyPost) {
+        await doc.reference.delete();
+        deletedCount++;
+        print('Deleted dummy post: ${doc.id}');
+      }
+    }
+    
+    print('Cleanup completed. Deleted $deletedCount dummy posts.');
+    
+  } catch (e) {
+    print('Error during cleanup: $e');
+  }
+}
+*/
+
+/*
+ * INSTRUCTIONS:
+ * 
+ * OPTION 1 - Manual cleanup through Firebase Console:
+ * 1. Go to Firebase Console (https://console.firebase.google.com)
+ * 2. Select your project
+ * 3. Go to Firestore Database
+ * 4. Open the "community_posts" collection
+ * 5. Look for any posts that look like test data
+ * 6. Delete them by clicking the document, then the trash icon
+ * 
+ * OPTION 2 - Temporary cleanup in app:
+ * The app will try to clean dummy posts automatically on startup
+ * 
+ * OPTION 3 - Complete reset:
+ * Delete the entire "community_posts" collection from Firebase Console
+ * to start completely fresh
+ * 
+ * After cleanup, real patients can create their own authentic posts!
+ */

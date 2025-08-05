@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hemophilia_manager/screens/main_screen/healthcare_provider_screen/healthcare_dashboard.dart';
 import 'package:hemophilia_manager/screens/main_screen/healthcare_provider_screen/healthcare_patients_list.dart';
+import 'package:hemophilia_manager/screens/main_screen/healthcare_provider_screen/healthcare_messages_screen.dart';
 
 class HealthcareMainScreen extends StatefulWidget {
   const HealthcareMainScreen({super.key});
@@ -18,12 +19,14 @@ class _HealthcareMainScreenState extends State<HealthcareMainScreen> {
   final iconList = <IconData>[
     Icons.dashboard,
     FontAwesomeIcons.peopleGroup,
+    FontAwesomeIcons.message,
   ];
 
   // LIST OF DISPLAYED SCREENS
   final List<Widget> _screens = [
     const HealthcareDashboard(),
     const HealthcarePatientsList(),
+    const HealthcareMessagesScreen(),
   ];
 
   @override

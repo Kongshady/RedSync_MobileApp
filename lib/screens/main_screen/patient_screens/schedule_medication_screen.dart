@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hemophilia_manager/services/firestore.dart';
 import 'package:hemophilia_manager/services/notification_service.dart';
+import 'package:hemophilia_manager/services/app_notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class ScheduleMedicationScreen extends StatefulWidget {
@@ -15,6 +16,8 @@ class ScheduleMedicationScreen extends StatefulWidget {
 class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final NotificationService _notificationService = NotificationService();
+  final AppNotificationService _appNotificationService =
+      AppNotificationService();
   String _medType = 'IV Injection';
   final List<String> _medTypes = ['IV Injection', 'Subcutaneous', 'Oral'];
   final TextEditingController _doseController = TextEditingController();
@@ -96,7 +99,7 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
                 ],
               ),
             ),
-        
+
             // Form Content
             Expanded(
               child: SingleChildScrollView(
@@ -110,7 +113,7 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
                       hintText: 'e.g., Factor VIII, Desmopressin',
                     ),
                     SizedBox(height: 16),
-        
+
                     _buildDropdownField(
                       value: _medType,
                       items: _medTypes,
@@ -121,7 +124,7 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
                       },
                     ),
                     SizedBox(height: 16),
-        
+
                     _buildCustomInput(
                       controller: _doseController,
                       label: 'Dosage',
@@ -129,10 +132,10 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
                       hintText: 'e.g., 1000 IU, 250 mg',
                     ),
                     SizedBox(height: 16),
-        
+
                     _buildTimeSelector(),
                     SizedBox(height: 16),
-        
+
                     _buildDropdownField(
                       value: _frequency,
                       items: _frequencies,
@@ -143,10 +146,10 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
                       },
                     ),
                     SizedBox(height: 16),
-        
+
                     _buildNotificationToggle(),
                     SizedBox(height: 16),
-        
+
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -169,9 +172,9 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
                         ),
                       ),
                     ),
-        
+
                     SizedBox(height: 32),
-        
+
                     // Set Schedule Button
                     SizedBox(
                       width: double.infinity,
@@ -205,7 +208,7 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
                         ),
                       ),
                     ),
-        
+
                     SizedBox(height: 16),
                   ],
                 ),
@@ -426,7 +429,15 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
       if (_notification) {
         try {
           await _notificationService.initialize();
-          await _notificationService.requestPermissions();
+          final permissionsGranted = await _notificationService
+              .requestPermissions();
+
+          if (!permissionsGranted) {
+            _showInfoDialog(
+              'Notification Warning',
+              'Notification permissions were not granted. You may not receive medication reminders. Please enable notifications in your device settings.',
+            );
+          }
 
           // Generate a unique notification ID based on the schedule ID hash
           final notificationId = scheduleId.hashCode;
@@ -488,19 +499,38 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
           await _notificationService.debugPendingNotifications();
 
           // Show a test notification to confirm notifications are working
-          await _notificationService.showImmediateNotification(
-            id: 99999,
-            title: 'Medication Schedule Created',
-            body:
-                'Your medication reminder for ${_medicationNameController.text.trim()} has been set up successfully!',
-            payload: 'schedule_created:$scheduleId',
-          );
+          try {
+            await _notificationService.showImmediateNotification(
+              id: 99999,
+              title: 'Medication Schedule Created',
+              body:
+                  'Your medication reminder for ${_medicationNameController.text.trim()} has been set up successfully!',
+              payload: 'schedule_created:$scheduleId',
+            );
+          } catch (e) {
+            print('Failed to show confirmation notification: $e');
+            // Don't fail the entire process if confirmation notification fails
+          }
+
+          // Also create a notification in our AppNotificationService for the in-app notifications
+          try {
+            await _appNotificationService.notifyMedicationReminder(
+              recipientId: user.uid,
+              medicationName: _medicationNameController.text.trim(),
+              dosage: _doseController.text.trim(),
+              scheduledTime:
+                  DateTime.now(), // This is just for creating the notification record
+            );
+          } catch (e) {
+            print('Failed to create in-app notification: $e');
+            // Don't fail the entire process if in-app notification fails
+          }
         } catch (e) {
           print('Error scheduling notification: $e');
           // Don't fail the entire operation if notification fails
           _showInfoDialog(
             'Notification Warning',
-            'Your medication was scheduled successfully, but there was an issue setting up notifications. Please check your notification settings.',
+            'Your medication was scheduled successfully, but there was an issue setting up notifications. Please check your notification settings and ensure you have granted permission for notifications and exact alarms. You can try rescheduling the medication to fix this issue.',
           );
         }
       }
@@ -629,3 +659,5 @@ class _ScheduleMedicationScreenState extends State<ScheduleMedicationScreen> {
     super.dispose();
   }
 }
+
+// TODO: Add calendar integration for medication reminders

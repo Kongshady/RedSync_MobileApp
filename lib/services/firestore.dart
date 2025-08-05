@@ -40,8 +40,9 @@ class FirestoreService {
       'updatedAt': FieldValue.serverTimestamp(),
     };
     if (role != null) data['role'] = role;
-    if (extra != null)
+    if (extra != null) {
       data.addAll(extra.map((key, value) => MapEntry(key, value as Object)));
+    }
     await _db.collection('users').doc(uid).update(data);
   }
 
@@ -91,6 +92,23 @@ class FirestoreService {
     });
   }
 
+  // Enhanced notification creation with navigation data
+  Future<void> createNotificationWithData({
+    required String uid,
+    required String text,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    await _db.collection('notifications').add({
+      'uid': uid,
+      'text': text,
+      'type': type,
+      'data': data ?? {},
+      'read': false,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
   Stream<QuerySnapshot> getNotifications(String uid) {
     try {
       if (uid.isEmpty) {
@@ -104,6 +122,24 @@ class FirestoreService {
     } catch (e) {
       print('Error in getNotifications: $e');
       rethrow;
+    }
+  }
+
+  // Get unread notification count stream
+  Stream<int> getUnreadNotificationCount(String uid) {
+    try {
+      if (uid.isEmpty) {
+        return Stream.value(0);
+      }
+      return _db
+          .collection('notifications')
+          .where('uid', isEqualTo: uid)
+          .where('read', isEqualTo: false)
+          .snapshots()
+          .map((snapshot) => snapshot.docs.length);
+    } catch (e) {
+      print('Error in getUnreadNotificationCount: $e');
+      return Stream.value(0);
     }
   }
 
@@ -414,11 +450,13 @@ class FirestoreService {
       final data = <String, dynamic>{'updatedAt': FieldValue.serverTimestamp()};
 
       if (defaultWeight != null) data['defaultWeight'] = defaultWeight;
-      if (defaultTargetLevel != null)
+      if (defaultTargetLevel != null) {
         data['defaultTargetLevel'] = defaultTargetLevel;
+      }
       if (preferredUnits != null) data['preferredUnits'] = preferredUnits;
-      if (autoSaveCalculations != null)
+      if (autoSaveCalculations != null) {
         data['autoSaveCalculations'] = autoSaveCalculations;
+      }
 
       await _db
           .collection('user_calculation_settings')
@@ -457,11 +495,79 @@ class FirestoreService {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // Notify healthcare providers who have access to this patient's data
+      await _notifyHealthcareProvidersOfBleedLog(
+        uid,
+        date,
+        bodyRegion,
+        severity,
+        doc.id,
+      );
+
       print('Bleed log saved successfully');
       return doc.id;
     } catch (e) {
       print('Error saving bleed log: $e');
       rethrow;
+    }
+  }
+
+  // Notify healthcare providers when patient logs a bleeding episode
+  Future<void> _notifyHealthcareProvidersOfBleedLog(
+    String patientUid,
+    String date,
+    String bodyRegion,
+    String severity,
+    String bleedLogId,
+  ) async {
+    try {
+      // Find all healthcare providers who have active data sharing with this patient
+      final dataSharingSnapshot = await _db
+          .collection('data_sharing')
+          .where('patientUid', isEqualTo: patientUid)
+          .where('active', isEqualTo: true)
+          .get();
+
+      // Get patient's name for the notification
+      String patientName = 'A patient';
+      try {
+        final userDoc = await _db.collection('users').doc(patientUid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          patientName = userData['name'] ?? 'A patient';
+        }
+      } catch (e) {
+        print('Error getting patient name: $e');
+      }
+
+      // Send notification to each healthcare provider
+      for (final doc in dataSharingSnapshot.docs) {
+        final data = doc.data();
+        final providerUid = data['providerUid'] as String;
+
+        await createNotificationWithData(
+          uid: providerUid,
+          text:
+              '$patientName logged a $severity bleeding episode in $bodyRegion on $date',
+          type: 'bleeding_log',
+          data: {
+            'patientUid': patientUid,
+            'patientName': patientName,
+            'bleedLogId': bleedLogId,
+            'date': date,
+            'bodyRegion': bodyRegion,
+            'severity': severity,
+          },
+        );
+      }
+
+      print(
+        'Bleeding log notifications sent to ${dataSharingSnapshot.docs.length} healthcare providers',
+      );
+    } catch (e) {
+      print('Error notifying healthcare providers of bleeding log: $e');
+      // Don't rethrow - bleeding log should still be saved even if notifications fail
     }
   }
 

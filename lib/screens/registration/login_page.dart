@@ -3,7 +3,7 @@ import 'package:hemophilia_manager/auth/auth.dart';
 import 'package:hemophilia_manager/services/firestore.dart';
 import 'package:hemophilia_manager/routes/routes.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:hemophilia_manager/screens/main_screen/patient_screens/main_screen_display.dart';
+import 'package:hemophilia_manager/screens/main_screen/patient_screens/main_screen_hud.dart';
 import 'package:hemophilia_manager/screens/main_screen/healthcare_provider_screen/healthcare_main_screen.dart';
 
 class LoginPage extends StatefulWidget {
@@ -21,6 +21,7 @@ class _LoginPageState extends State<LoginPage> {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   bool _isLoading = false;
   bool _rememberMe = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -186,7 +187,8 @@ class _LoginPageState extends State<LoginPage> {
                     controller: _passwordController,
                     label: 'Password',
                     icon: Icons.lock_outline,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
+                    showPasswordToggle: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Enter password';
                       return null;
@@ -281,6 +283,7 @@ class _LoginPageState extends State<LoginPage> {
     required IconData icon,
     TextInputType? keyboardType,
     bool obscureText = false,
+    bool showPasswordToggle = false,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
@@ -291,6 +294,19 @@ class _LoginPageState extends State<LoginPage> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.redAccent),
+        suffixIcon: showPasswordToggle
+            ? IconButton(
+                icon: Icon(
+                  obscureText ? Icons.visibility : Icons.visibility_off,
+                  color: Colors.grey.shade600,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              )
+            : null,
         border: UnderlineInputBorder(),
         labelStyle: TextStyle(color: Colors.grey.shade700),
         focusedBorder: UnderlineInputBorder(

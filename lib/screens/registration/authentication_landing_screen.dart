@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hemophilia_manager/auth/auth.dart';
+import 'package:hemophilia_manager/services/firestore.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AuthenticationLandingScreen extends StatefulWidget {
   const AuthenticationLandingScreen({super.key});
 
   @override
-  State<AuthenticationLandingScreen> createState() => _AuthenticationLandingScreenState();
+  State<AuthenticationLandingScreen> createState() =>
+      _AuthenticationLandingScreenState();
 }
 
-class _AuthenticationLandingScreenState extends State<AuthenticationLandingScreen> {
+class _AuthenticationLandingScreenState
+    extends State<AuthenticationLandingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -66,7 +70,7 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
                   ],
                 ),
               ),
-              
+
               // Authentication Options Section
               Expanded(
                 flex: 3,
@@ -82,7 +86,10 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
                               title: 'Login',
                               icon: Icons.login,
                               isPrimary: true,
-                              onTap: () => Navigator.pushReplacementNamed(context, '/login'),
+                              onTap: () => Navigator.pushReplacementNamed(
+                                context,
+                                '/login',
+                              ),
                             ),
                           ),
                           SizedBox(width: 16),
@@ -91,14 +98,17 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
                               title: 'Register',
                               icon: Icons.person_add,
                               isPrimary: true,
-                              onTap: () => Navigator.pushReplacementNamed(context, '/register'),
+                              onTap: () => Navigator.pushReplacementNamed(
+                                context,
+                                '/register',
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      
+
                       SizedBox(height: 20),
-                      
+
                       // Divider with text
                       Row(
                         children: [
@@ -127,9 +137,9 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
                           ),
                         ],
                       ),
-                      
+
                       SizedBox(height: 20),
-                      
+
                       // Google Sign In
                       SizedBox(
                         width: double.infinity,
@@ -142,9 +152,9 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
                           },
                         ),
                       ),
-                      
+
                       SizedBox(height: 12),
-                      
+
                       // Guest Access
                       SizedBox(
                         width: double.infinity,
@@ -153,25 +163,163 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
                           icon: Icons.person_outline,
                           isPrimary: false,
                           onTap: () async {
+                            // Show info dialog first
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      color: Colors.blue,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Guest Mode'),
+                                  ],
+                                ),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('As a guest, you can:'),
+                                    SizedBox(height: 8),
+                                    Text('• Access educational resources'),
+                                    Text('• Use the dosage calculator'),
+                                    Text('• Find nearby clinics'),
+                                    Text('• Try the pre-screening tool'),
+                                    SizedBox(height: 12),
+                                    Container(
+                                      padding: EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.orange.shade200,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.warning_amber,
+                                            color: Colors.orange.shade700,
+                                            size: 16,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Note: Data won\'t be saved between sessions',
+                                              style: TextStyle(
+                                                color: Colors.orange.shade700,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.redAccent,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: Text('Continue'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (confirmed != true) return;
+
                             try {
-                              await AuthService().signInAnonymously();
-                              if (mounted) {
-                                Navigator.pushReplacementNamed(context, '/user_screen');
-                              }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to continue as guest'),
-                                  backgroundColor: Colors.red,
+                              // Show loading indicator
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => AlertDialog(
+                                  content: Row(
+                                    children: [
+                                      CircularProgressIndicator(),
+                                      SizedBox(width: 16),
+                                      Text('Signing in as guest...'),
+                                    ],
+                                  ),
                                 ),
                               );
+
+                              // Sign in anonymously
+                              final user = await AuthService()
+                                  .signInAnonymously();
+
+                              if (user != null && mounted) {
+                                // Create basic guest profile in Firestore
+                                await FirestoreService().createUser(
+                                  user.uid,
+                                  'Guest User',
+                                  'guest@redsyncph.com',
+                                  'patient',
+                                );
+
+                                // Store guest session data
+                                final storage = FlutterSecureStorage();
+                                await storage.write(
+                                  key: 'isLoggedIn',
+                                  value: 'true',
+                                );
+                                await storage.write(
+                                  key: 'userRole',
+                                  value: 'patient',
+                                );
+                                await storage.write(
+                                  key: 'userUid',
+                                  value: user.uid,
+                                );
+                                await storage.write(
+                                  key: 'isGuest',
+                                  value: 'true',
+                                );
+
+                                if (mounted) {
+                                  Navigator.pop(
+                                    context,
+                                  ); // Close loading dialog
+                                  Navigator.pushReplacementNamed(
+                                    context,
+                                    '/user_screen',
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                Navigator.pop(
+                                  context,
+                                ); // Close loading dialog if open
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Failed to continue as guest: ${e.toString()}',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                    duration: Duration(seconds: 3),
+                                  ),
+                                );
+                              }
                             }
                           },
                         ),
                       ),
-                      
+
                       SizedBox(height: 12),
-                      
+
                       // Pre-screening Button
                       SizedBox(
                         width: double.infinity,
@@ -188,7 +336,7 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
                   ),
                 ),
               ),
-              
+
               // Footer Section
               Container(
                 padding: EdgeInsets.symmetric(vertical: 12),
@@ -307,11 +455,7 @@ class _AuthenticationLandingScreenState extends State<AuthenticationLandingScree
       height: 48,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: Icon(
-          icon,
-          size: 18,
-          color: iconColor,
-        ),
+        icon: Icon(icon, size: 18, color: iconColor),
         label: Text(
           title,
           style: TextStyle(

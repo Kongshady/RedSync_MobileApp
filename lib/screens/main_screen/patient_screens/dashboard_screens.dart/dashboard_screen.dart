@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hemophilia_manager/services/firestore.dart';
-import 'package:hemophilia_manager/screens/main_screen/patient_screens/dashboard_screens.dart/emergency_fab.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -14,8 +14,10 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   final FirestoreService _firestoreService = FirestoreService();
+  final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   String _userName = '';
   bool _isLoading = true;
+  bool _isGuest = false;
   List<Map<String, dynamic>> _recentBleeds = [];
   List<Map<String, dynamic>> _recentInfusions = [];
   List<Map<String, dynamic>> _recentActivities = [];
@@ -39,17 +41,31 @@ class _DashboardState extends State<Dashboard> {
 
   Future<void> _loadUserData() async {
     try {
+      // Check if user is a guest
+      final guestStatus = await _secureStorage.read(key: 'isGuest');
+      setState(() {
+        _isGuest = guestStatus == 'true';
+      });
+
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final userData = await _firestoreService.getUser(user.uid);
         if (userData != null) {
           setState(() {
-            _userName = userData['name'] ?? 'User';
+            _userName = _isGuest ? 'Guest' : (userData['name'] ?? 'User');
+          });
+        } else {
+          setState(() {
+            _userName = _isGuest ? 'Guest' : 'User';
           });
         }
       }
     } catch (e) {
       print('Error loading user data: $e');
+      setState(() {
+        _userName = 'User';
+        _isGuest = false;
+      });
     } finally {
       setState(() => _isLoading = false);
     }
@@ -194,6 +210,73 @@ class _DashboardState extends State<Dashboard> {
                     ),
                   ],
                 ),
+
+                // Guest Mode Indicator
+                if (_isGuest) ...[
+                  SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.blue.shade700,
+                          size: 20,
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Guest Mode',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Data won\'t be saved. Create an account to track your health progress.',
+                                style: TextStyle(
+                                  color: Colors.blue.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushReplacementNamed(
+                              context,
+                              '/register',
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.blue.shade700,
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                          child: Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 SizedBox(height: 32),
 
                 // Quick Stats Section
@@ -257,14 +340,12 @@ class _DashboardState extends State<Dashboard> {
                       ),
                   ],
                 ),
-                SizedBox(height: 25),
+                SizedBox(height: 50), // Add extra spacing at bottom instead of FAB space
               ],
             ),
           ),
         ),
-      ),
-      floatingActionButton: EmergencyFab(),
-    );
+    ));
   }
 
   Widget _buildQuickStats() {

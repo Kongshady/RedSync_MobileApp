@@ -4,16 +4,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import '../shared/chat_screen.dart';
 import '../../../services/message_service.dart';
-import 'compose_message_screen.dart';
 
-class MessagesScreen extends StatefulWidget {
-  const MessagesScreen({super.key});
+class HealthcareMessagesScreen extends StatefulWidget {
+  const HealthcareMessagesScreen({super.key});
 
   @override
-  State<MessagesScreen> createState() => _MessagesScreenState();
+  State<HealthcareMessagesScreen> createState() =>
+      _HealthcareMessagesScreenState();
 }
 
-class _MessagesScreenState extends State<MessagesScreen> {
+class _HealthcareMessagesScreenState extends State<HealthcareMessagesScreen> {
   final TextEditingController _searchController = TextEditingController();
   final MessageService _messageService = MessageService();
 
@@ -49,14 +49,18 @@ class _MessagesScreenState extends State<MessagesScreen> {
   void _setupConversationStream() {
     if (_currentUserId == null) return;
 
-    print('Setting up conversation stream for user: $_currentUserId');
+    print(
+      'Setting up conversation stream for healthcare provider: $_currentUserId',
+    );
 
     _conversationSubscription?.cancel();
     _conversationSubscription = _messageService
         .getConversationsStream(_currentUserId!)
         .listen(
           (conversations) {
-            print('Received ${conversations.length} conversations from stream');
+            print(
+              'Healthcare provider received ${conversations.length} conversations from stream',
+            );
             setState(() {
               _messages = conversations;
               _filteredMessages = conversations;
@@ -64,7 +68,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             });
           },
           onError: (error) {
-            print('Error in conversation stream: $error');
+            print('Error in healthcare provider conversation stream: $error');
             setState(() {
               _isLoading = false;
             });
@@ -80,7 +84,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
         _isLoading = true;
       });
 
-      // Get conversations for the current user
+      // Get conversations for the current healthcare provider
       final conversations = await _messageService.getConversations(
         _currentUserId!,
       );
@@ -118,12 +122,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
           final lastMessage = (conversation['lastMessage'] ?? '')
               .toString()
               .toLowerCase();
-          final specialization = (otherUser['specialization'] ?? '')
-              .toString()
-              .toLowerCase();
+          final email = (otherUser['email'] ?? '').toString().toLowerCase();
           return senderName.contains(query.toLowerCase()) ||
               lastMessage.contains(query.toLowerCase()) ||
-              specialization.contains(query.toLowerCase());
+              email.contains(query.toLowerCase());
         }).toList();
       }
     });
@@ -156,7 +158,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
             'role': otherUser['role'],
             'profilePicture': otherUser['profilePicture'],
           },
-          currentUserRole: 'patient',
+          currentUserRole: 'medical',
         ),
       ),
     );
@@ -172,7 +174,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
       appBar: AppBar(
         title: Column(
           children: [
-            Text('Messages', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text(
+              'Patient Messages',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             if (unreadCount > 0)
               Text(
                 '$unreadCount unread',
@@ -187,12 +192,52 @@ class _MessagesScreenState extends State<MessagesScreen> {
         actions: [
           IconButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ComposeMessageScreen()),
+              // TODO: Implement priority filter or sorting
+              showModalBottomSheet(
+                context: context,
+                builder: (context) => Container(
+                  padding: EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Message Filters',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      ListTile(
+                        leading: Icon(
+                          FontAwesomeIcons.exclamation,
+                          color: Colors.red,
+                        ),
+                        title: Text('Urgent Messages'),
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      ListTile(
+                        leading: Icon(
+                          FontAwesomeIcons.clock,
+                          color: Colors.orange,
+                        ),
+                        title: Text('Recent Messages'),
+                        onTap: () => Navigator.pop(context),
+                      ),
+                      ListTile(
+                        leading: Icon(
+                          FontAwesomeIcons.envelope,
+                          color: Colors.blue,
+                        ),
+                        title: Text('Unread Messages'),
+                        onTap: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
               );
             },
-            icon: Icon(FontAwesomeIcons.penToSquare, size: 20),
+            icon: Icon(FontAwesomeIcons.filter, size: 20),
           ),
         ],
       ),
@@ -212,7 +257,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 controller: _searchController,
                 onChanged: _filterMessages,
                 decoration: InputDecoration(
-                  hintText: 'Search messages...',
+                  hintText: 'Search patients, messages, or conditions...',
                   hintStyle: TextStyle(color: Colors.grey.shade400),
                   prefixIcon: Icon(
                     FontAwesomeIcons.magnifyingGlass,
@@ -236,7 +281,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                         CircularProgressIndicator(color: Colors.redAccent),
                         SizedBox(height: 16),
                         Text(
-                          'Loading messages...',
+                          'Loading patient messages...',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 16,
@@ -272,16 +317,6 @@ class _MessagesScreenState extends State<MessagesScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => ComposeMessageScreen()),
-          );
-        },
-        backgroundColor: Colors.redAccent,
-        child: Icon(FontAwesomeIcons.plus, color: Colors.white),
-      ),
     );
   }
 
@@ -298,14 +333,14 @@ class _MessagesScreenState extends State<MessagesScreen> {
               borderRadius: BorderRadius.circular(40),
             ),
             child: Icon(
-              FontAwesomeIcons.commentSlash,
+              FontAwesomeIcons.userDoctor,
               color: Colors.grey.shade400,
               size: 32,
             ),
           ),
           SizedBox(height: 24),
           Text(
-            'No messages yet',
+            'No patient messages',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -314,28 +349,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            'Start a conversation with your healthcare provider',
+            'Patient conversations will appear here',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ComposeMessageScreen()),
-              );
-            },
-            icon: Icon(FontAwesomeIcons.plus, size: 16),
-            label: Text('New Message'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
           ),
         ],
       ),
@@ -345,6 +360,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
   Widget _buildMessageTile(Map<String, dynamic> conversation) {
     final otherUser = conversation['otherUser'];
     final isUnread = !conversation['isLastMessageRead'];
+    final isCaregiver = otherUser['role'] == 'caregiver';
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -360,15 +376,21 @@ class _MessagesScreenState extends State<MessagesScreen> {
         leading: Stack(
           children: [
             CircleAvatar(
-              radius: 24,
-              backgroundColor: Colors.grey.shade200,
+              radius: 26,
+              backgroundColor: isCaregiver
+                  ? Colors.purple.shade100
+                  : Colors.blue.shade100,
               backgroundImage: otherUser['profilePicture'] != null
                   ? NetworkImage(otherUser['profilePicture'])
                   : null,
               child: otherUser['profilePicture'] == null
                   ? Icon(
-                      FontAwesomeIcons.user,
-                      color: Colors.grey.shade500,
+                      isCaregiver
+                          ? FontAwesomeIcons.userGroup
+                          : FontAwesomeIcons.user,
+                      color: isCaregiver
+                          ? Colors.purple.shade600
+                          : Colors.blue.shade600,
                       size: 18,
                     )
                   : null,
@@ -378,11 +400,11 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 top: 0,
                 right: 0,
                 child: Container(
-                  width: 12,
-                  height: 12,
+                  width: 14,
+                  height: 14,
                   decoration: BoxDecoration(
                     color: Colors.redAccent,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(7),
                     border: Border.all(color: Colors.white, width: 2),
                   ),
                 ),
@@ -418,16 +440,21 @@ class _MessagesScreenState extends State<MessagesScreen> {
           children: [
             SizedBox(height: 4),
             Text(
-              otherUser['specialization'] ??
-                  otherUser['role'] ??
-                  'Healthcare Provider',
+              otherUser['role'] == 'caregiver' ? 'Caregiver' : 'Patient',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.blue.shade600,
+                color: isCaregiver
+                    ? Colors.purple.shade600
+                    : Colors.blue.shade600,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            SizedBox(height: 6),
+            if (otherUser['email'] != null && otherUser['email'].isNotEmpty)
+              Text(
+                otherUser['email'],
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            SizedBox(height: 8),
             Text(
               conversation['lastMessage'] ?? 'No messages yet',
               style: TextStyle(
@@ -440,10 +467,22 @@ class _MessagesScreenState extends State<MessagesScreen> {
             ),
           ],
         ),
-        trailing: Icon(
-          FontAwesomeIcons.chevronRight,
-          color: Colors.grey.shade400,
-          size: 14,
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              FontAwesomeIcons.chevronRight,
+              color: Colors.grey.shade400,
+              size: 14,
+            ),
+            if (isUnread) SizedBox(height: 4),
+            if (isUnread)
+              Icon(
+                FontAwesomeIcons.exclamation,
+                color: Colors.red.shade500,
+                size: 12,
+              ),
+          ],
         ),
         onTap: () => _openChatScreen(conversation),
       ),

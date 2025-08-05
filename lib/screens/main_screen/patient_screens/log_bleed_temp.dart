@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'log_bleed_new.dart';
 
 class LogBleed extends StatelessWidget {
   const LogBleed({super.key});

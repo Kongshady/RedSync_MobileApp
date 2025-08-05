@@ -15,66 +15,71 @@ class _ClinicLocatorScreenState extends State<ClinicLocatorScreen> {
   String selectedType = "clinic";
   Position? _currentPosition;
   bool _isLoadingLocation = false;
+  bool _showList = false;
 
-  // Add these new variables for polyline
-  Set<Polyline> _polylines = {};
+  final Set<Polyline> _polylines = {};
   Map<String, dynamic>? _selectedLocation;
-  bool _showPolyline = false; // Add this new variable
 
   // Enhanced clinics data with distance calculation support
   List<Map<String, dynamic>> clinics = [
     {
-      'name': 'Dr. Heide P. Abdurahman (Adult Hematologist)',
+      'name': 'Dr. Heide P. Abdurahman',
+      'type': 'Adult Hematologist',
       'address':
           'Metro Davao Medical & Research Center, J.P. Laurel Ave, Bajada, Davao City',
       'lat': '7.095116',
       'lng': '125.613161',
       'contact': '09099665139',
-      'schedule': 'Wednesday & Friday 1 pm – 6 pm',
-      'distance': null,
-      'distanceValue': double.infinity, // For sorting
-    },
-    {
-      'name': 'Dr. Lilia Matildo Yu (Pediatric Hematologist)',
-      'address':
-          'Medical Arts Building, front of San Pedro Hospital, Guerrero St., Davao City',
-      'lat': '7.078266',
-      'lng': '125.614739',
-      'contact': 'Unknown',
-      'schedule': 'Unknown',
+      'schedule': 'Wed & Fri 1-6 PM',
       'distance': null,
       'distanceValue': double.infinity,
     },
     {
-      'name': 'Dr. Jeannie B. Ong (Pediatric Hematologist)',
+      'name': 'Dr. Lilia Matildo Yu',
+      'type': 'Pediatric Hematologist',
+      'address':
+          'Medical Arts Building, front of San Pedro Hospital, Guerrero St., Davao City',
+      'lat': '7.078266',
+      'lng': '125.614739',
+      'contact': 'Call for info',
+      'schedule': 'By appointment',
+      'distance': null,
+      'distanceValue': double.infinity,
+    },
+    {
+      'name': 'Dr. Jeannie B. Ong',
+      'type': 'Pediatric Hematologist',
       'address': 'San Pedro Hospital, Guzman St., Davao City',
       'lat': '7.078959',
       'lng': '125.614977',
       'contact': '09924722148',
-      'schedule': 'Mon, Thu & Fri 10 am – 1 pm',
+      'schedule': 'Mon, Thu & Fri 10 AM-1 PM',
       'distance': null,
       'distanceValue': double.infinity,
     },
   ];
 
-  // Enhanced drug outlets data
   List<Map<String, dynamic>> drugOutlets = [
     {
-      'name': 'Globo Asiatico Enterprises, Inc.',
+      'name': 'Globo Asiatico Enterprises',
+      'type': 'Medical Supply',
       'address': 'Door #4 Eldec Realty Bldg., Cabaguio Ave, Agdao, Davao City',
       'lat': '7.0894',
       'lng': '125.6232',
       'contact': '+63 82 224 1234',
+      'schedule': 'Mon-Sat 8 AM-6 PM',
       'distance': null,
       'distanceValue': double.infinity,
     },
     {
       'name': 'CLE Bio and Medical Supply',
+      'type': 'Medical Supply',
       'address':
           '#003 Chiong Bldg, Flyover, Buhangin (JP Laurel Ave), Davao City',
       'lat': '7.0968',
       'lng': '125.6152',
       'contact': '+63 82 234 5678',
+      'schedule': 'Mon-Fri 9 AM-5 PM',
       'distance': null,
       'distanceValue': double.infinity,
     },
@@ -144,38 +149,10 @@ class _ClinicLocatorScreenState extends State<ClinicLocatorScreen> {
       _calculateAllDistances();
       _updateMarkers();
       _centerMapOnUser();
-
-      // Show success feedback
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  'Location updated! ${_getCurrentDataList().length} locations sorted by distance.',
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
     } catch (e) {
       setState(() {
         _isLoadingLocation = false;
       });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Location error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
@@ -292,14 +269,15 @@ class _ClinicLocatorScreenState extends State<ClinicLocatorScreen> {
           infoWindow: InfoWindow(
             title: location['name'],
             snippet: location['distance'] != null
-                ? '${location['distance']} km • ${_getDistanceStatus(location['distance'])}'
-                : 'Distance unknown',
+                ? '${location['distance']} km • ${location['type']}'
+                : location['type'],
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             selectedType == "clinic"
-                ? BitmapDescriptor.hueBlue
-                : BitmapDescriptor.hueRed,
+                ? BitmapDescriptor.hueRed
+                : BitmapDescriptor.hueBlue,
           ),
+          onTap: () => _showLocationDetails(location),
         ),
       );
     }
@@ -325,9 +303,182 @@ class _ClinicLocatorScreenState extends State<ClinicLocatorScreen> {
     return selectedType == "clinic" ? clinics : drugOutlets;
   }
 
-  // 🗺️ Create Polyline to Selected Location
-  void _createPolylineToLocation(Map<String, dynamic> location) {
-    if (_currentPosition == null || !_showPolyline) return;
+  // Show location details in a bottom sheet
+  void _showLocationDetails(Map<String, dynamic> location) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildLocationBottomSheet(location),
+    );
+  }
+
+  // Bottom sheet widget for location details
+  Widget _buildLocationBottomSheet(Map<String, dynamic> location) {
+    return Container(
+      margin: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: selectedType == "clinic"
+                        ? Colors.redAccent.withOpacity(0.1)
+                        : Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    selectedType == "clinic"
+                        ? FontAwesomeIcons.userDoctor
+                        : FontAwesomeIcons.pills,
+                    color: selectedType == "clinic"
+                        ? Colors.redAccent
+                        : Colors.blue,
+                    size: 18,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        location['name'],
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        location['type'],
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: selectedType == "clinic"
+                              ? Colors.redAccent
+                              : Colors.blue,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (location['distance'] != null)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getDistanceColor(
+                        location['distance'],
+                      ).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${location['distance']} km',
+                      style: TextStyle(
+                        color: _getDistanceColor(location['distance']),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: 16),
+            _buildInfoRow(FontAwesomeIcons.locationDot, location['address']),
+            _buildInfoRow(FontAwesomeIcons.phone, location['contact']),
+            _buildInfoRow(FontAwesomeIcons.clock, location['schedule']),
+            SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _createRouteToLocation(location),
+                    icon: Icon(FontAwesomeIcons.route, size: 16),
+                    label: Text('Show Route'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: selectedType == "clinic"
+                          ? Colors.redAccent
+                          : Colors.blue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(FontAwesomeIcons.xmark, size: 16),
+                  label: Text('Close'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey.shade200,
+                    foregroundColor: Colors.grey.shade700,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: Colors.grey.shade600),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _createRouteToLocation(Map<String, dynamic> location) {
+    // Close the bottom sheet/modal first
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+
+    if (_currentPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Current location not available. Please enable location services.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _selectedLocation = location;
@@ -343,548 +494,387 @@ class _ClinicLocatorScreenState extends State<ClinicLocatorScreen> {
               double.parse(location['lng']!),
             ),
           ],
-          color: selectedType == "clinic"
-              ? Colors.blue.shade700
-              : Colors.red.shade700, // Darker color
-          width: 6, // Increased width from 4 to 6
-          patterns: [
-            PatternItem.dash(25),
-            PatternItem.gap(15),
-          ], // Longer dashes
-          startCap: Cap.roundCap,
-          endCap: Cap.roundCap,
-          geodesic: true, // Add this for better accuracy over long distances
+          color: selectedType == "clinic" ? Colors.redAccent : Colors.blue,
+          width: 4,
+          patterns: [PatternItem.dash(20), PatternItem.gap(10)],
         ),
       );
     });
 
-    // Center map to show both points
+    // Show success message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.route, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Route displayed on map'),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
+
     _fitMapToShowBothPoints(location);
   }
 
-  // Toggle polyline visibility
-  void _zoomToLocation(Map<String, dynamic> location) {
-    if (_mapController != null) {
+  void _fitMapToShowBothPoints(Map<String, dynamic> location) {
+    if (_mapController == null || _currentPosition == null) return;
+
+    try {
+      final userLat = _currentPosition!.latitude;
+      final userLng = _currentPosition!.longitude;
+      final locLat = double.parse(location['lat']!);
+      final locLng = double.parse(location['lng']!);
+
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          userLat < locLat ? userLat : locLat,
+          userLng < locLng ? userLng : locLng,
+        ),
+        northeast: LatLng(
+          userLat > locLat ? userLat : locLat,
+          userLng > locLng ? userLng : locLng,
+        ),
+      );
+
       _mapController!.animateCamera(
-        CameraUpdate.newLatLngZoom(
+        CameraUpdate.newLatLngBounds(bounds, 100.0),
+      );
+    } catch (e) {
+      print('Error fitting map to show both points: $e');
+      // Fallback: just move to the destination
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLng(
           LatLng(
             double.parse(location['lat']!),
             double.parse(location['lng']!),
           ),
-          16, // Higher zoom level for better detail
         ),
       );
     }
   }
 
-  // Fit map to show both user location and selected location
-  void _fitMapToShowBothPoints(Map<String, dynamic> location) {
-    if (_mapController == null || _currentPosition == null) return;
-
-    final userLat = _currentPosition!.latitude;
-    final userLng = _currentPosition!.longitude;
-    final locLat = double.parse(location['lat']!);
-    final locLng = double.parse(location['lng']!);
-
-    final bounds = LatLngBounds(
-      southwest: LatLng(
-        userLat < locLat ? userLat : locLat,
-        userLng < locLng ? userLng : locLng,
-      ),
-      northeast: LatLng(
-        userLat > locLat ? userLat : locLat,
-        userLng > locLng ? userLng : locLng,
-      ),
-    );
-
-    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100.0));
-  }
-
-  // Clear polyline
-  void _clearPolyline() {
-    setState(() {
-      _polylines.clear();
-      _selectedLocation = null;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final dataList = _getCurrentDataList();
-
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Enhanced Header with Location Status
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text(
+          'Access Care Locator',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.redAccent,
+        elevation: 0,
+        actions: [
+          Container(
+            margin: EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: selectedType == "clinic"
+                  ? Colors.redAccent.withOpacity(0.1)
+                  : Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextButton.icon(
+              onPressed: _toggleLocationType,
+              icon: Icon(
+                selectedType == "clinic"
+                    ? FontAwesomeIcons.userDoctor
+                    : FontAwesomeIcons.pills,
+                size: 14,
+                color: selectedType == "clinic"
+                    ? Colors.redAccent
+                    : Colors.blue,
+              ),
+              label: Text(
+                selectedType == "clinic" ? 'Clinics' : 'Outlets',
+                style: TextStyle(
+                  color: selectedType == "clinic"
+                      ? Colors.redAccent
+                      : Colors.blue,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // Large Map View
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _currentPosition != null
+                  ? LatLng(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
+                    )
+                  : const LatLng(7.0731, 125.6128),
+              zoom: 13,
+            ),
+            markers: _markers,
+            polylines: _polylines,
+            onMapCreated: (controller) {
+              _mapController = controller;
+              if (_currentPosition != null) {
+                _centerMapOnUser();
+              }
+            },
+            myLocationEnabled: false,
+            myLocationButtonEnabled: false,
+            compassEnabled: true,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+          ),
+
+          // Top Status Bar
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
                 children: [
+                  Icon(
+                    selectedType == "clinic"
+                        ? FontAwesomeIcons.userDoctor
+                        : FontAwesomeIcons.pills,
+                    color: selectedType == "clinic"
+                        ? Colors.redAccent
+                        : Colors.blue,
+                    size: 16,
+                  ),
+                  SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Access Care Locator',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 24,
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              _currentPosition != null
-                                  ? 'Locations sorted by distance'
-                                  : 'Find nearby clinics or drug outlets',
-                            ),
-                            if (_isLoadingLocation) ...[
-                              const SizedBox(width: 8),
-                              const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ],
-                            // Add polyline status indicator
-                            if (_currentPosition != null && _showPolyline) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      (selectedType == "clinic"
-                                              ? Colors.blue
-                                              : Colors.red)
-                                          .withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color:
-                                        (selectedType == "clinic"
-                                                ? Colors.blue
-                                                : Colors.red)
-                                            .withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.timeline,
-                                      size: 12,
-                                      color: selectedType == "clinic"
-                                          ? Colors.blue
-                                          : Colors.red,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Routes ON',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: selectedType == "clinic"
-                                            ? Colors.blue
-                                            : Colors.red,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
+                    child: Text(
+                      _getCurrentDataList().isNotEmpty
+                          ? '${_getCurrentDataList().length} ${selectedType == "clinic" ? "treatment centers" : "drug outlets"} found'
+                          : 'Loading locations...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                  if (_isLoadingLocation)
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: selectedType == "clinic"
+                            ? Colors.redAccent
+                            : Colors.blue,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // Bottom Controls
+          Positioned(
+            bottom: 24,
+            left: 16,
+            right: 16,
+            child: Row(
+              children: [
+                // List Toggle Button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _showList = !_showList;
+                      });
+                      if (_showList) {
+                        _showLocationsList();
+                      }
+                    },
+                    icon: Icon(
+                      FontAwesomeIcons.list,
+                      color: selectedType == "clinic"
+                          ? Colors.redAccent
+                          : Colors.blue,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+
+                // My Location Button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: IconButton(
+                    onPressed: _getCurrentLocation,
+                    icon: Icon(
+                      FontAwesomeIcons.locationCrosshairs,
+                      color: selectedType == "clinic"
+                          ? Colors.redAccent
+                          : Colors.blue,
+                    ),
+                  ),
+                ),
+
+                Spacer(),
+
+                // Clear Route Button (if route exists)
+                if (_polylines.isNotEmpty)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    onPressed: _showFilterBottomSheet,
-                    icon: const Icon(
-                      FontAwesomeIcons.filter,
-                      color: Colors.redAccent,
+                    child: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _polylines.clear();
+                          _selectedLocation = null;
+                        });
+                      },
+                      icon: Icon(
+                        FontAwesomeIcons.xmark,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ),
-                ],
-              ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-              const SizedBox(height: 15),
+  void _toggleLocationType() {
+    setState(() {
+      selectedType = selectedType == "clinic" ? "drug" : "clinic";
+      _polylines.clear();
+      _selectedLocation = null;
+    });
+    _updateMarkers();
+  }
 
-              // Enhanced Google Map
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 200,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: _currentPosition != null
-                          ? LatLng(
-                              _currentPosition!.latitude,
-                              _currentPosition!.longitude,
-                            )
-                          : const LatLng(
-                              7.0731,
-                              125.6128,
-                            ), // Default to Davao City
-                      zoom: 13,
-                    ),
-                    markers: _markers,
-                    polylines: _polylines, // Add polylines
-                    onMapCreated: (controller) {
-                      _mapController = controller;
-                      if (_currentPosition != null) {
-                        _centerMapOnUser();
-                      }
-                    },
-                    myLocationEnabled: _currentPosition != null,
-                    myLocationButtonEnabled: true,
-                    compassEnabled: true,
-                    zoomControlsEnabled: true, // Enable zoom controls
-                  ),
+  void _showLocationsList() {
+    final dataList = _getCurrentDataList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.3,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
 
-              const SizedBox(height: 18),
-
-              // Enhanced List Header with Statistics
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${selectedType == "clinic" ? "Treatment Centers" : "Drug Outlets"} (${dataList.length})',
-                        style: const TextStyle(
+              // Header
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      selectedType == "clinic"
+                          ? FontAwesomeIcons.userDoctor
+                          : FontAwesomeIcons.pills,
+                      color: selectedType == "clinic"
+                          ? Colors.redAccent
+                          : Colors.blue,
+                      size: 20,
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        selectedType == "clinic"
+                            ? 'Treatment Centers'
+                            : 'Drug Outlets',
+                        style: TextStyle(
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          fontSize: 17,
+                          color: Colors.black87,
                         ),
                       ),
-                      if (_currentPosition != null)
-                        Text(
-                          'Closest: ${dataList.isNotEmpty && dataList[0]['distance'] != null ? "${dataList[0]['distance']} km" : "Unknown"}',
-                          style: TextStyle(
-                            color: Colors.green.shade600,
-                            fontSize: 13,
-                          ),
-                        )
-                      else
-                        const Text(
-                          'Enable location for distances',
-                          style: TextStyle(color: Colors.black54, fontSize: 13),
-                        ),
-                    ],
-                  ),
-                ],
+                    ),
+                    Text(
+                      '${dataList.length} found',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              const SizedBox(height: 10),
+              Divider(height: 1, color: Colors.grey.shade200),
 
-              // Enhanced Location List with Distance Details and Route Buttons
+              // List
               Expanded(
-                child: ListView.separated(
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: dataList.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final item = dataList[index];
-                    final hasDistance = item['distance'] != null;
-                    final canShowRoute =
-                        _currentPosition != null && hasDistance;
-
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                        border: hasDistance
-                            ? Border.all(
-                                color: _getDistanceColor(
-                                  item['distance'],
-                                ).withOpacity(0.3),
-                                width: 1,
-                              )
-                            : null,
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(12),
-                        leading: Container(
-                          width: 45,
-                          height: 45,
-                          decoration: BoxDecoration(
-                            color: selectedType == "clinic"
-                                ? Colors.blue.shade50
-                                : Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            selectedType == "clinic"
-                                ? FontAwesomeIcons.hospitalUser
-                                : FontAwesomeIcons.pills,
-                            color: selectedType == "clinic"
-                                ? Colors.blue.shade600
-                                : Colors.red.shade600,
-                            size: 20,
-                          ),
-                        ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                item['name']!,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                            if (hasDistance)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _getDistanceColor(
-                                    item['distance'],
-                                  ).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _getDistanceColor(
-                                      item['distance'],
-                                    ).withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      _getDistanceIcon(item['distance']),
-                                      size: 12,
-                                      color: _getDistanceColor(
-                                        item['distance'],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${item['distance']} km',
-                                      style: TextStyle(
-                                        color: _getDistanceColor(
-                                          item['distance'],
-                                        ),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text(
-                              item['address']!,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                            if (item['contact'] != 'Unknown') ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                '📞 ${item['contact']}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blue.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                            if (hasDistance) ...[
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _getDistanceColor(
-                                    item['distance'],
-                                  ).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  _getDistanceStatus(item['distance']),
-                                  style: TextStyle(
-                                    color: _getDistanceColor(item['distance']),
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            // Add Route Button Row
-                            if (canShowRoute) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  // Toggle Route Button
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        // Check if this location already has a route
-                                        bool hasActiveRoute =
-                                            _selectedLocation == item &&
-                                            _polylines.isNotEmpty;
-
-                                        if (hasActiveRoute) {
-                                          // Clear the route
-                                          _clearPolyline();
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            const SnackBar(
-                                              content: Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.clear,
-                                                    color: Colors.white,
-                                                  ),
-                                                  SizedBox(width: 8),
-                                                  Text('Route cleared'),
-                                                ],
-                                              ),
-                                              backgroundColor: Colors.grey,
-                                              duration: Duration(seconds: 1),
-                                            ),
-                                          );
-                                        } else {
-                                          // Show the route
-                                          _selectedLocation = item;
-                                          _showPolylineForLocation(item);
-                                          _zoomToLocation(item);
-
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Row(
-                                                children: [
-                                                  const Icon(
-                                                    Icons.route,
-                                                    color: Colors.white,
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: Text(
-                                                      'Route to ${item['name']} (${item['distance']} km)',
-                                                      style: const TextStyle(
-                                                        fontSize: 13,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              backgroundColor:
-                                                  selectedType == "clinic"
-                                                  ? Colors.blue
-                                                  : Colors.red,
-                                              duration: const Duration(
-                                                seconds: 2,
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      icon: Icon(
-                                        _selectedLocation == item &&
-                                                _polylines.isNotEmpty
-                                            ? Icons.clear
-                                            : Icons.directions,
-                                        size: 16,
-                                      ),
-                                      label: Text(
-                                        _selectedLocation == item &&
-                                                _polylines.isNotEmpty
-                                            ? 'Clear Route'
-                                            : 'Show Route',
-                                      ),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            _selectedLocation == item &&
-                                                _polylines.isNotEmpty
-                                            ? Colors.grey.shade600
-                                            : (selectedType == "clinic"
-                                                  ? Colors.blue
-                                                  : Colors.red),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 8,
-                                          horizontal: 12,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                        trailing: Icon(
-                          Icons.zoom_in,
-                          color: Colors.grey.shade600,
-                        ),
-                        onTap: () {
-                          // Only zoom to the selected location
-                          _zoomToLocation(item);
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.zoom_in,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Zoomed to ${item['name']}',
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              backgroundColor: Colors.green,
-                              duration: const Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                      ),
-                    );
+                    return _buildLocationListItem(item);
                   },
                 ),
               ),
@@ -892,110 +882,136 @@ class _ClinicLocatorScreenState extends State<ClinicLocatorScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: "clinic_locator_fab", // Unique tag to avoid conflicts
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        label: Text(selectedType == "clinic" ? 'Find Clinics' : 'Find Outlets'),
-        backgroundColor: selectedType == "clinic" ? Colors.blue : Colors.red,
-        foregroundColor: Colors.white,
-        icon: Icon(
-          selectedType == "clinic"
-              ? FontAwesomeIcons.hospitalUser
-              : FontAwesomeIcons.pills,
-        ),
-        onPressed: _showFilterBottomSheet,
-      ),
     );
   }
 
-  void _showFilterBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  Widget _buildLocationListItem(Map<String, dynamic> item) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              const Text(
-                'What are you looking for?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Colors.redAccent,
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: selectedType == "clinic"
+                      ? Colors.redAccent.withOpacity(0.1)
+                      : Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  selectedType == "clinic"
+                      ? FontAwesomeIcons.userDoctor
+                      : FontAwesomeIcons.pills,
+                  color: selectedType == "clinic"
+                      ? Colors.redAccent
+                      : Colors.blue,
+                  size: 16,
                 ),
               ),
-              const SizedBox(height: 18),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade600,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    FontAwesomeIcons.hospitalUser,
-                    color: Colors.white,
-                  ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item['name'],
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      item['type'],
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: selectedType == "clinic"
+                            ? Colors.redAccent
+                            : Colors.blue,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-                title: const Text('Treatment Centers'),
-                subtitle: Text(
-                  'Find ${clinics.length} nearby hemophilia treatment centers',
-                  style: const TextStyle(color: Colors.black54, fontSize: 13),
-                ),
-                trailing: selectedType == "clinic"
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : null,
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    selectedType = "clinic";
-                    _updateMarkers();
-                  });
-                },
               ),
-              const Divider(height: 1, color: Colors.black12),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
+              if (item['distance'] != null)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade600,
+                    color: _getDistanceColor(item['distance']).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    FontAwesomeIcons.pills,
-                    color: Colors.white,
+                  child: Text(
+                    '${item['distance']} km',
+                    style: TextStyle(
+                      color: _getDistanceColor(item['distance']),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                title: const Text('Drug Outlets'),
-                subtitle: Text(
-                  'Find ${drugOutlets.length} nearby pharmacies and drug outlets',
-                  style: const TextStyle(color: Colors.black54, fontSize: 13),
+            ],
+          ),
+          SizedBox(height: 12),
+          Text(
+            item['address'],
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+              height: 1.3,
+            ),
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _createRouteToLocation(item);
+                  },
+                  icon: Icon(FontAwesomeIcons.route, size: 14),
+                  label: Text('Route'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: selectedType == "clinic"
+                        ? Colors.redAccent
+                        : Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
-                trailing: selectedType == "drug"
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : null,
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    selectedType = "drug";
-                    _updateMarkers();
-                  });
-                },
+              ),
+              SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () => _showLocationDetails(item),
+                icon: Icon(FontAwesomeIcons.circleInfo, size: 14),
+                label: Text('Info'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade200,
+                  foregroundColor: Colors.grey.shade700,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                ),
               ),
             ],
           ),
-        );
-      },
+        ],
+      ),
     );
-  }
-
-  // Fix: Add the missing method
-  void _showPolylineForLocation(Map<String, dynamic> location) {
-    _showPolyline = true;
-    _createPolylineToLocation(location);
   }
 }

@@ -13,6 +13,14 @@ class NotificationService {
 
   bool _isInitialized = false;
 
+  // Add a navigation callback for handling notification taps
+  static void Function(String)? _onNotificationTap;
+
+  // Set the callback for handling notification navigation
+  static void setNavigationCallback(void Function(String) callback) {
+    _onNotificationTap = callback;
+  }
+
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -43,12 +51,54 @@ class NotificationService {
     await _flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification tap
-        print('Notification tapped: ${response.payload}');
+        // Handle notification tap safely
+        try {
+          print('Notification tapped: ${response.payload}');
+          _handleNotificationTap(response);
+        } catch (e) {
+          print('Error handling notification tap: $e');
+          // Don't crash the app if notification handling fails
+        }
       },
     );
 
     _isInitialized = true;
+  }
+
+  // Handle notification tap safely
+  void _handleNotificationTap(NotificationResponse response) {
+    try {
+      final payload = response.payload;
+      if (payload != null) {
+        print('Notification tapped with payload: $payload');
+
+        // Use the navigation callback if available
+        if (_onNotificationTap != null) {
+          _onNotificationTap!(payload);
+        } else {
+          print('No navigation callback set for notification handling');
+        }
+
+        // Handle different types of notifications
+        if (payload.startsWith('medication_reminder:')) {
+          print('Medication reminder notification tapped');
+        } else if (payload.startsWith('schedule_created:')) {
+          print('Schedule creation notification tapped');
+        } else if (payload.startsWith('post_like:') ||
+            payload.startsWith('post_comment:') ||
+            payload.startsWith('post_share:')) {
+          print('Post-related notification tapped');
+        } else if (payload.startsWith('message:')) {
+          print('Message notification tapped');
+        } else if (payload == 'test_notification' ||
+            payload == 'test_scheduled_notification') {
+          print('Test notification tapped');
+        }
+      }
+    } catch (e) {
+      print('Error in notification tap handler: $e');
+      // Don't let notification handling crash the app
+    }
   }
 
   Future<bool> requestPermissions() async {
@@ -90,9 +140,20 @@ class NotificationService {
     required DateTime scheduledTime,
     String? payload,
   }) async {
-    if (!_isInitialized) await initialize();
-
     try {
+      if (!_isInitialized) await initialize();
+
+      // Validate inputs
+      if (title.isEmpty || body.isEmpty) {
+        print('Warning: Notification title or body is empty');
+        return;
+      }
+
+      if (scheduledTime.isBefore(DateTime.now())) {
+        print('Warning: Scheduled time is in the past, adjusting to future');
+        scheduledTime = DateTime.now().add(Duration(minutes: 1));
+      }
+
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
             'medication_reminders',
@@ -141,7 +202,8 @@ class NotificationService {
       print('Notification scheduled successfully!');
     } catch (e) {
       print('Error scheduling medication reminder: $e');
-      rethrow;
+      // Don't rethrow to prevent app crashes - just log the error
+      // The app should continue functioning even if notifications fail
     }
   }
 
@@ -153,9 +215,15 @@ class NotificationService {
     required RepeatInterval repeatInterval,
     String? payload,
   }) async {
-    if (!_isInitialized) await initialize();
-
     try {
+      if (!_isInitialized) await initialize();
+
+      // Validate inputs
+      if (title.isEmpty || body.isEmpty) {
+        print('Warning: Notification title or body is empty');
+        return;
+      }
+
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
             'medication_reminders',
@@ -218,7 +286,7 @@ class NotificationService {
       print('Repeating notification scheduled successfully!');
     } catch (e) {
       print('Error scheduling repeating medication reminder: $e');
-      rethrow;
+      // Don't rethrow to prevent app crashes - just log the error
     }
   }
 
@@ -246,22 +314,56 @@ class NotificationService {
         location = tz.UTC;
       }
 
-      // Convert to TZDateTime
-      final tzDateTime = tz.TZDateTime.from(dateTime, location);
+      // Convert to TZDateTime with additional safety checks
+      tz.TZDateTime tzDateTime;
+      try {
+        tzDateTime = tz.TZDateTime.from(dateTime, location);
+      } catch (e) {
+        print(
+          'Warning: Failed to convert with tz.TZDateTime.from, trying manual creation: $e',
+        );
+        try {
+          tzDateTime = tz.TZDateTime(
+            location,
+            dateTime.year,
+            dateTime.month,
+            dateTime.day,
+            dateTime.hour,
+            dateTime.minute,
+            dateTime.second,
+          );
+        } catch (e2) {
+          print(
+            'Warning: Manual TZDateTime creation failed, using UTC fallback: $e2',
+          );
+          tzDateTime = tz.TZDateTime.utc(
+            dateTime.year,
+            dateTime.month,
+            dateTime.day,
+            dateTime.hour,
+            dateTime.minute,
+            dateTime.second,
+          );
+        }
+      }
+
       print(
         'Converted DateTime $dateTime to TZDateTime $tzDateTime in timezone ${location.name}',
       );
       return tzDateTime;
     } catch (e) {
-      print('Error: Timezone conversion failed completely: $e');
-      // As a last resort, create a TZDateTime in UTC
+      print(
+        'Error: Timezone conversion failed completely, using current time in UTC: $e',
+      );
+      // As a last resort, create a TZDateTime in UTC for the current time + 1 minute
+      final fallbackTime = DateTime.now().add(Duration(minutes: 1));
       return tz.TZDateTime.utc(
-        dateTime.year,
-        dateTime.month,
-        dateTime.day,
-        dateTime.hour,
-        dateTime.minute,
-        dateTime.second,
+        fallbackTime.year,
+        fallbackTime.month,
+        fallbackTime.day,
+        fallbackTime.hour,
+        fallbackTime.minute,
+        fallbackTime.second,
       );
     }
   }
@@ -361,6 +463,168 @@ class NotificationService {
       print('=== END DEBUG ===');
     } catch (e) {
       print('Error getting pending notifications: $e');
+    }
+  }
+
+  // Create notification for post interactions (like, comment, share)
+  Future<void> showPostNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String postId,
+    required String type, // 'like', 'comment', 'share'
+  }) async {
+    try {
+      if (!_isInitialized) await initialize();
+
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+            'post_notifications',
+            'Post Notifications',
+            channelDescription: 'Notifications for post interactions',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            enableVibration: true,
+            playSound: true,
+            styleInformation: BigTextStyleInformation(''),
+          );
+
+      const DarwinNotificationDetails iosPlatformChannelSpecifics =
+          DarwinNotificationDetails(
+            sound: 'default',
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          );
+
+      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+        iOS: iosPlatformChannelSpecifics,
+      );
+
+      final payload = 'post_${type}:$postId';
+
+      await _flutterLocalNotificationsPlugin.show(
+        id,
+        title,
+        body,
+        platformChannelSpecifics,
+        payload: payload,
+      );
+
+      print('Post notification sent: $payload');
+    } catch (e) {
+      print('Error showing post notification: $e');
+    }
+  }
+
+  // Create notification for messages
+  Future<void> showMessageNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String senderId,
+    required String conversationId,
+  }) async {
+    try {
+      if (!_isInitialized) await initialize();
+
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+            'message_notifications',
+            'Message Notifications',
+            channelDescription: 'Notifications for new messages',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            enableVibration: true,
+            playSound: true,
+            styleInformation: BigTextStyleInformation(''),
+          );
+
+      const DarwinNotificationDetails iosPlatformChannelSpecifics =
+          DarwinNotificationDetails(
+            sound: 'default',
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          );
+
+      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+        iOS: iosPlatformChannelSpecifics,
+      );
+
+      final payload = 'message:$senderId:$conversationId';
+
+      await _flutterLocalNotificationsPlugin.show(
+        id,
+        title,
+        body,
+        platformChannelSpecifics,
+        payload: payload,
+      );
+
+      print('Message notification sent: $payload');
+    } catch (e) {
+      print('Error showing message notification: $e');
+    }
+  }
+
+  // Enhanced medication reminder notification that appears in notification center
+  Future<void> showMedicationReminderNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String scheduleId,
+  }) async {
+    try {
+      if (!_isInitialized) await initialize();
+
+      const AndroidNotificationDetails androidPlatformChannelSpecifics =
+          AndroidNotificationDetails(
+            'medication_reminders',
+            'Medication Reminders',
+            channelDescription: 'Reminders for medication intake',
+            importance: Importance.max,
+            priority: Priority.max,
+            icon: '@mipmap/ic_launcher',
+            enableVibration: true,
+            playSound: true,
+            styleInformation: BigTextStyleInformation(''),
+            ongoing: false,
+            autoCancel: true,
+            fullScreenIntent: false,
+          );
+
+      const DarwinNotificationDetails iosPlatformChannelSpecifics =
+          DarwinNotificationDetails(
+            sound: 'default',
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+            badgeNumber: 1,
+          );
+
+      const NotificationDetails platformChannelSpecifics = NotificationDetails(
+        android: androidPlatformChannelSpecifics,
+        iOS: iosPlatformChannelSpecifics,
+      );
+
+      final payload = 'medication_reminder:$scheduleId';
+
+      await _flutterLocalNotificationsPlugin.show(
+        id,
+        title,
+        body,
+        platformChannelSpecifics,
+        payload: payload,
+      );
+
+      print('Medication reminder notification sent: $payload');
+    } catch (e) {
+      print('Error showing medication reminder notification: $e');
     }
   }
 }

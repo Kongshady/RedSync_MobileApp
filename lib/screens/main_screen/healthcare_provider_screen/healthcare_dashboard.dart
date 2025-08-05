@@ -40,160 +40,191 @@ class _HealthcareDashboardState extends State<HealthcareDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         toolbarHeight: 70,
-        title: Image.asset('assets/images/app_logo.png', width: 60),
-        centerTitle: true,
+        title: Text(
+          'RedSync PH',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.redAccent,
+        elevation: 0,
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: CircleAvatar(
-              // ignore: deprecated_member_use
-              backgroundColor: Colors.redAccent.withOpacity(0.15),
-              child: IconButton(
-                icon: const Icon(FontAwesomeIcons.solidBell, color: Colors.redAccent),
-                onPressed: () {
-                  Navigator.pushNamed(context, '/notifications');
-                },
-              ),
+            child: StreamBuilder<int>(
+              stream: FirestoreService().getUnreadNotificationCount(currentUid),
+              builder: (context, snapshot) {
+                final unreadCount = snapshot.data ?? 0;
+                return Stack(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: Colors.redAccent.withOpacity(0.1),
+                      child: IconButton(
+                        icon: const Icon(
+                          FontAwesomeIcons.solidBell,
+                          color: Colors.redAccent,
+                          size: 18,
+                        ),
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/notifications');
+                        },
+                      ),
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            unreadCount > 99 ? '99+' : unreadCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 12.0),
+            padding: const EdgeInsets.only(right: 16.0),
             child: GestureDetector(
               onTap: () {
                 Navigator.pushNamed(context, '/settings');
               },
               child: CircleAvatar(
                 radius: 20,
-                backgroundImage: AssetImage('assets/avatar_placeholder.png'),
-                child: Icon(Icons.person, color: Colors.white70),
+                backgroundColor: Colors.grey.shade200,
+                child: Icon(Icons.person, color: Colors.grey.shade600),
               ),
             ),
           ),
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header Section
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade700,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          FontAwesomeIcons.userDoctor,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Welcome back,',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 14,
-                              ),
-                            ),
-                            Text(
-                              _userName,
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pushNamed(context, '/notifications');
-                        },
-                        child: Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                            Icons.notifications_outlined,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'RedSyncPH Healthcare Provider Portal',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Welcome Section
+              _buildWelcomeSection(),
 
-            // Content Section
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(20),
+              // Quick Stats
+              _buildQuickStats(),
+
+              // Main Content Sections
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Real-time Stats Section
-                    _buildRealTimeStatsSection(),
-                    SizedBox(height: 24),
-
-                    // Recent Patients Section
-                    _buildSectionHeader('Recent Patient Activity', FontAwesomeIcons.users),
+                    SizedBox(height: 32),
+                    _buildSectionTitle('Your Patients'),
                     SizedBox(height: 16),
-                    _buildRecentPatients(),
-                    SizedBox(height: 24),
+                    _buildPatientsOverview(),
 
-                    // Pending Requests Section
-                    _buildSectionHeader('Pending Requests', FontAwesomeIcons.inbox),
+                    SizedBox(height: 32),
+                    _buildSectionTitle('Pending Requests'),
                     SizedBox(height: 16),
-                    _buildPendingRequests(),
+                    _buildPendingRequestsSection(),
+
+                    SizedBox(height: 40),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildRealTimeStatsSection() {
+  Widget _buildWelcomeSection() {
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.all(20),
+      padding: EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.redAccent, Colors.red.shade700],
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  FontAwesomeIcons.userDoctor,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Good day,',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Dr. $_userName',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Manage your patients and monitor their health data seamlessly',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.85),
+              fontSize: 15,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickStats() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('data_sharing')
@@ -211,26 +242,38 @@ class _HealthcareDashboardState extends State<HealthcareDashboard> {
             final totalPatients = patientsSnapshot.data?.docs.length ?? 0;
             final pendingRequests = requestsSnapshot.data?.docs.length ?? 0;
 
-            return Row(
-              children: [
-                Expanded(
-                  child: _buildStatContainer(
-                    icon: FontAwesomeIcons.users,
-                    value: '$totalPatients',
-                    label: 'Active Patients',
-                    color: Colors.blue,
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildStatItem(
+                      icon: FontAwesomeIcons.users,
+                      label: 'Active Patients',
+                      value: totalPatients.toString(),
+                      color: Colors.blue.shade600,
+                    ),
                   ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatContainer(
-                    icon: FontAwesomeIcons.envelope,
-                    value: '$pendingRequests',
-                    label: 'Pending Requests',
-                    color: Colors.orange,
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatItem(
+                      icon: FontAwesomeIcons.clockRotateLeft,
+                      label: 'Pending Requests',
+                      value: pendingRequests.toString(),
+                      color: Colors.orange.shade600,
+                    ),
                   ),
-                ),
-              ],
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatItem(
+                      icon: FontAwesomeIcons.message,
+                      label: 'Messages',
+                      value: '3',
+                      color: Colors.green.shade600,
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -238,76 +281,59 @@ class _HealthcareDashboardState extends State<HealthcareDashboard> {
     );
   }
 
-  Widget _buildStatContainer({
+  Widget _buildStatItem({
     required IconData icon,
-    required String value,
     required String label,
+    required String value,
     required Color color,
   }) {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade100),
       ),
       child: Column(
         children: [
-          Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          SizedBox(height: 8),
+          Icon(icon, color: color, size: 22),
+          SizedBox(height: 12),
           Text(
             value,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
           ),
+          SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
+            maxLines: 2,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.blue.shade700.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 20, color: Colors.blue.shade700),
-        ),
-        SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-      ],
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: Colors.black87,
+      ),
     );
   }
 
-  Widget _buildRecentPatients() {
+  Widget _buildPatientsOverview() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('data_sharing')
@@ -317,87 +343,95 @@ class _HealthcareDashboardState extends State<HealthcareDashboard> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-            height: 100,
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return _buildLoadingContainer();
         }
 
         final patients = snapshot.data?.docs ?? [];
 
         if (patients.isEmpty) {
-          return Container(
-            padding: EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(FontAwesomeIcons.users, size: 32, color: Colors.grey.shade400),
-                  SizedBox(height: 12),
-                  Text(
-                    'No patients yet',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
+          return _buildEmptyState(
+            icon: FontAwesomeIcons.users,
+            title: 'No patients yet',
+            subtitle: 'Patients who share data with you will appear here',
           );
         }
 
         return Column(
-          children: patients.take(3).map((doc) {
-            final data = doc.data() as Map<String, dynamic>;
-            return Container(
-              margin: EdgeInsets.only(bottom: 12),
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.blue.shade100,
-                    child: Icon(Icons.person, color: Colors.blue.shade700),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Patient ID: ${data['patientUid'].substring(0, 8)}...',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          'Data sharing active',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: Colors.grey.shade400),
-                ],
-              ),
-            );
-          }).toList(),
+          children: [
+            ...patients.map((doc) => _buildPatientItem(doc)),
+            if (patients.length >= 3)
+              _buildViewAllButton('View all patients', () {
+                Navigator.pushNamed(context, '/patientsList');
+              }),
+          ],
         );
       },
     );
   }
 
-  Widget _buildPendingRequests() {
+  Widget _buildPatientItem(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.blue.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.person, color: Colors.blue.shade600, size: 20),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Patient',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'ID: ${data['patientUid'].substring(0, 8)}...',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              'Active',
+              style: TextStyle(
+                color: Colors.green.shade700,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPendingRequestsSection() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('data_sharing_requests')
@@ -407,123 +441,227 @@ class _HealthcareDashboardState extends State<HealthcareDashboard> {
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-            height: 100,
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return _buildLoadingContainer();
         }
 
         final requests = snapshot.data?.docs ?? [];
 
         if (requests.isEmpty) {
-          return Container(
-            padding: EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(FontAwesomeIcons.inbox, size: 32, color: Colors.grey.shade400),
-                  SizedBox(height: 12),
-                  Text(
-                    'No pending requests',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
+          return _buildEmptyState(
+            icon: FontAwesomeIcons.inbox,
+            title: 'No pending requests',
+            subtitle: 'New data sharing requests will appear here',
           );
         }
 
         return Column(
           children: [
-            ...requests.take(2).map((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              return Container(
-                margin: EdgeInsets.only(bottom: 12),
-                padding: EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        FontAwesomeIcons.envelope,
-                        color: Colors.orange.shade700,
-                        size: 16,
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'New data sharing request',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          Text(
-                            'Patient ID: ${data['patientUid'].substring(0, 8)}...',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, color: Colors.orange.shade400),
-                  ],
-                ),
-              );
-            }),
-            if (requests.length > 2)
-              GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/healthcare_patients'),
-                child: Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'View all ${requests.length} requests',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Icon(
-                        Icons.arrow_forward,
-                        color: Colors.blue.shade700,
-                        size: 16,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            ...requests.map((doc) => _buildRequestItem(doc)),
+            if (requests.length >= 3)
+              _buildViewAllButton('View all requests', () {
+                // Navigate to requests tab
+              }),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildRequestItem(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.orange.shade100,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              FontAwesomeIcons.userPlus,
+              color: Colors.orange.shade600,
+              size: 16,
+            ),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'New data sharing request',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Patient ID: ${data['patientUid'].substring(0, 8)}...',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            FontAwesomeIcons.chevronRight,
+            color: Colors.orange.shade400,
+            size: 14,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: Colors.grey.shade400),
+          SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingContainer() {
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: Colors.redAccent,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewAllButton(String text, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              text,
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(
+              FontAwesomeIcons.chevronRight,
+              color: Colors.redAccent,
+              size: 12,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
